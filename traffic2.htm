@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Motorway traffic flow - phantom traffic jams</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="Description" content="Traffic flow on a motorway. Vary the speed and traffic density to make your own phantom traffic jams.">
+<meta name="keywords" content="phantom traffic jam, motorway, traffic flow, traffic density, 2 second gap, safe gap, safe distance, stopping distance, braking distance, traffic wave, driver reaction time, driver thinking time">
+<meta name="copyright" content="Copyright 2009 - 2018 Brian Jones, All Rights Reserved">
+
+<style>
+
+@import url('https://fonts.googleapis.com/css?family=Questrial|Poppins');
+
+	.questrial {
+	font-family: 'Questrial', sans-serif;
+	font-size: 20px;
+	}
+
+	h2 {
+		font-family: 'Questrial', sans-serif;
+		font-size: 26px;
+		font-weight: bold;
+	}
+
+	h3 {
+		font-family: 'Questrial', sans-serif;
+		font-size: 22px;
+		font-weight: bold;
+	}
+
+	p {
+		font-family: 'Poppins', sans-serif;
+		font-size: 18px;
+		font-weight: normal;
+		text-align:justify;
+		/* text-justify:inter-word; */
+		color: #444;
+	}
+	
+	ul {
+		font-size: 18px;
+		text-align:left;	
+		color: #444;
+	}
+
+	body {
+		background-color: #FFFFFF;
+		font-family: 'Questrial', sans-serif;
+		font-size: smaller;
+		color: #000000;
+
+		width: 100%;
+		text-align: center;
+	}
+
+	.center {
+		margin: auto;
+		width: 60%;
+		border: 2px solid #73AD21;
+		border-radius: 5px;
+		padding: 10px;
+	}
+	
+	#centerContainer {
+		width: 900px;
+		text-align: center;
+		margin: 0px auto;
+	}
+
+	.colhead {
+		font: bold 15px arial, sans-serif;
+	}
+</style>
+
+<script>
+
+var thisid=60;
+var carsinfront=25;
+
+var t
+function timedCount() {
+	showUser("60");
+	t=setTimeout("timedCount()",15000);
+}
+</script>
+
+</head>
+
+<body>
+
+<noscript>
+	<h2>Your browser does not support JavaScript!</h2>
+	<p style="color:red;"><strong>
+	This illustration will only work if JavaScript is enabled in your browser.<br>
+	For Internet Explorer this can be enabled from Tools > Internet Options > Security > Custom Level > Active Scripting and choose Enable.<br>
+	For Firefox this can be enabled from Tools > Options > Content and tick the Enable JavaScript box.<br>
+	For Opera this can be enabled from Tools > Preferences > Advanced > Content and tick the Enable JavaScript box.
+	</strong></p>
+</noscript>
+
+<script>
+
+var cyclecount = 0; //equivalent to static in function animate
+var Xpos = 0;
+var Ypos = 0; //top of road
+var RoadWidth = 68;
+var m_to_ft = 3.28084;
+
+function buttonColorClear(vClass) {
+    var buttons = document.getElementsByClassName(vClass);
+
+    for (var J = buttons.length - 1;  J >= 0;  --J) {
+        var btn = buttons[J];
+		btn.style.backgroundColor = "Lightgrey";
+    }
+}
+
+function DriveAspiredSpeed(vSpeed, vID) {
+	ASPIRED_SPEED = vSpeed;
+	showdanger();
+	buttonColorClear("SpeedButton");
+	document.getElementById(vID).style.backgroundColor = "Yellow";
+}
+
+function Grip(vGrip, vID) {
+	BRAKING_DISTANCE_FACTOR = vGrip;
+	showdanger();
+	buttonColorClear("GripButton");
+	document.getElementById(vID).style.backgroundColor = "Yellow";
+}
+
+function VehiclesPerMinute(vVPM, vID) {
+	CARS_PER_MINUTE = vVPM;
+	showdanger();
+	buttonColorClear("VPMButton");
+	document.getElementById(vID).style.backgroundColor = "Yellow";
+}
+
+
+function DriveLeft() {
+	CarOffsetY = 41;
+	document.getElementById("btnDriveLeft").style.backgroundColor = "Yellow";
+	document.getElementById("btnDriveRight").style.backgroundColor = "Lightgrey";
+}
+
+function DriveRight() {
+	CarOffsetY = 32;
+	document.getElementById("btnDriveLeft").style.backgroundColor = "Lightgrey";
+	document.getElementById("btnDriveRight").style.backgroundColor = "Yellow";
+}
+
+//offset 27 for driving on the left
+//offset 18 for driving on the right
+
+var CarOffsetY = 41;
+
+	//The road . The road moves according to the speed/acceleration of car0
+	//called dashes because the notion was to show road markings, but this evolved into pictorial motorway.
+var nDashes = 3;
+
+	//22.3mph = 10mps    say 1 metre is a pixel
+	//30 m/s = 67mph = 7108kph
+	//20 m/s = 45 mph = 72 kph
+	//The value of 30 initialised gets set immediately to the slider value (20 as at 20090322) - thus ignored here
+var SPEED = 30;
+var ASPIRED_SPEED = 30;
+
+	//calculation interval in secs
+var DELTAT = 0.02;
+
+var DASHSIZE =1400;
+	//recalc road position every n seconds
+var DASH_RECALC = DELTAT;
+var n_dash_spacing = 1400;
+
+//GAP_MULTIPLIER multiplies standard gapsec (mean 1 sec) therefore GAP_MULTIPLIER 2 makes an average gap of 2 second and GAP_MULTIPLIER 10 makes a gap of 10 secs
+//not used after December 2008 but reintroduced March 2009 on 4th slider
+//And changed from a default value of 2. And used in a different way than earlier versions
+var GAP_MULTIPLIER = 1;
+//Note that CARS_PER_MINUTE will immediately assume slider value
+var CARS_PER_MINUTE = 30;
+
+//BRAKING_DISTANCE_FACTOR a value less than 1 that reduces braking performance in the wet
+var BRAKING_DISTANCE_FACTOR = 1;
+
+//REACTION_TIME_FACTOR increases reaction time in poor visibility - say by 10% in dark and rain
+var REACTION_TIME_FACTOR = 1;
+
+var isNetscape = navigator.appName=="well Firefox reports as Netscape but behaves like IE";//"Netscape";
+var isOpera = navigator.appName=="Opera";
+
+var ncars = 70;
+var SigmaL = 0; //total lenght of cars - metres
+var SigmaG = 0; //total gap in seconds
+var g = 9.81; //m/s/s notional g force used for max and min decelleration of the lead car and therefore the road
+
+var w = new Array(); //w is width on screen = length of car should be between 2 and 12 m long
+var cars = new Array();
+var dashes = new Array();
+
+var carspeed = new Array();  //current speed of car
+var accel = new Array();     //acceleration per car
+var decel = new Array();     //deceleration per car
+var thinkmax = new Array();  //how long the driver needs to thing before reacting
+var thinknow = new Array();  //how long has driver been thinking
+var gapsec = new Array();    //intended gap in seconds
+
+/*
+make car lengths = w
+base on random length somewhere around 4 metres long but not less than 2
+writes the page layout div tags
+*/
+initw();
+function initw() {
+ //whilst before 20080709 this originally initiated all these variables later they should be revalued from a SQL table
+ //see makecars below
+	var i = 0;
+	for (i = 1; i <= ncars; i++) {
+		carspeed[i] = SPEED;
+
+		//g=9.81 m/s/s - assume no-one accelerates more than 2 or decel more than 7
+		accel[i] = 2;	//Many can accelerate faster than 2 but probably don't choose to here
+		decel[i] = 7;  	//Highway Code stopping distance assumes 6.5 m/s/s
+
+		//reaction time in seconds 0.7 is fastest possible - say 1.25 is middle (0.7+ 0.55)
+		thinkmax[i] = 0.7; //+ ( GaussRandom(11) / 10 );  //Highway Code says 0.67 seconds if driver is alert etc.
+		thinknow[i] = 0;	//how long this driver has been thinking before reacting
+	}
+}
+
+
+function thinktime() {
+	//not called too often - maybe inefficient - attempt at skewed normal bell curve
+	var arraythink = [0.7,0.8,0.9,1.0,1.0,1.1,1.1,1.1,1.2,1.2,1.2,1.2,1.3,1.3,1.3,1.4,1.4,1.5,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5];
+	return arraythink[Math.floor(Math.random() * 29)];
+}
+
+function carlength() {
+	//not called too often
+	var arrayw = [4,4.2,4.4,4.4,4.5,4.5,4.5,4.5,4.5,4.6,4.6,4.8,5,5,6,7];
+	return arrayw[Math.floor(Math.random() * 16)];
+}
+
+
+//write the car divs
+makecardivs();
+function makecardivs() {
+//first just the DIVs
+	var i = 0;
+ 	for (i = 1; i <= ncars; i++) {
+ 		document.write("<div id='car" + i + "' style='position: absolute; height:11px; width:10px; z-index: 1;'></div>");
+ 	}
+}
+
+
+//remakes the cars and their colors and resets other variables
+makecarsfromtable();
+function makecarsfromtable() {
+	var i = 0;
+ 	for (i = 1; i <= ncars; i++) {
+		var id = "car"+i;
+		var thinksecs = thinktime();
+		var carw = carlength();
+ 		var element = document.getElementById(id);
+		element.innerHTML = "<img src='carb.gif' width='"+carw+"' height='3'>";
+		w[i]=carw; SigmaL +=carw; gapsec[i]=thinksecs; SigmaG +=thinksecs;
+	}
+}
+
+function showdanger() {
+	var V = CARS_PER_MINUTE;
+	var S = ASPIRED_SPEED;
+	var G = BRAKING_DISTANCE_FACTOR;
+
+	//empirically guessed
+	var d = (V/(11*G))*(0.8+(S/100));
+	d = Math.round(d);
+	if (d > 20) d = 20;
+
+	var i = 0;
+	//var danger = "<table width=\"100%\" border=\"1\" align=\"center\" cellpadding=\"0\" cellspacing=\"0\" bordercolor=\"#FFFFFF\"><tr>";
+	var danger = "<table style=\"border:1px; spacing:0px; padding:0px; text-align=center; width=100%;\"><tr>";
+		danger += "<td colspan=\"20\" style=\"font:14px arial, sans-serif;\">Danger level</td></tr><tr>";
+
+		for (i = 1; i <= d; i++) {
+			danger += "<td style=\"font:14px Courier monospace; background-color:red\">&nbsp;&nbsp;&nbsp;</td>"
+		}
+
+		for (i = d+1; i <= 20; i++) {
+			danger += "<td style=\"font:14px Courier monospace; background-color:green\">&nbsp;&nbsp;&nbsp;</td>"
+		}
+
+	danger +="</tr></table>";
+	document.getElementById("danger").innerHTML=danger;
+}
+
+//end block 3 -->
+</script>
+
+
+
+<!-- <DIV ID="page" align="center"> -->
+
+<div id="centerContainer">
+
+<!--   20080130   use pictures for motorway movement -->
+<div id="dash0" style="position: absolute; height: 11px; width: 11px;"><img src="motorwaylong.gif" alt="" height="68" width="1400"></div>
+<div id="dash1" style="position: absolute; height: 11px; width: 11px;"><img src="motorwaylong.gif" alt="" height="68" width="1400"></div>
+<div id="dash2" style="position: absolute; height: 11px; width: 11px;"><img src="motorwaylong.gif" alt="" height="68" width="1400"></div>
+<div id="dash3" style="position: absolute; height: 11px; width: 11px;"><img src="motorwaylongstill.gif" alt="" height="6" width="1400"></div>
+
+<!-- maintable0 determines where the road appears - underneath -->
+  <table style="border:1px; spacing:2px; padding:2px; width=95%; "  ID="maintable0">
+    <tr>
+      <td style="text-align:center;"><h1>Traffic flow. How vehicles respond to varying speed, traffic density and conditions. The phantom traffic jam.</h1></td>
+    </tr>
+  </table>
+
+  <br><br><br><br><br><br>
+	<div class="center">
+		<table style="border:0; spacing:0px; padding:1px; text-align:left;" ID="maintable">
+			<tr>
+				<td>
+					<form name="AspiredSpeed">
+						<table style="border: 1px solid gray;">
+							<tr>
+								<td>
+									<span class="colhead">Leader</span><br>
+									<input id="txtSpeed" type="Text" size="4"><br>
+
+									<input type="button" onclick="DriveAspiredSpeed(36, this.id)" value="80 mph" id="button36" class="SpeedButton"><br>
+									<input type="button" onclick="DriveAspiredSpeed(29, this.id)" value="65 mph" id="button29" class="SpeedButton"><br>
+									<input type="button" onclick="DriveAspiredSpeed(20, this.id)" value="45 mph" id="button20" class="SpeedButton"><br>
+									<input type="button" onclick="DriveAspiredSpeed(15, this.id)" value="33 mph" id="button15" class="SpeedButton"><br>
+									<input type="button" onclick="DriveAspiredSpeed(10, this.id)" value="22 mph" id="button10" class="SpeedButton"><br>
+								</td>
+								<td style="vertical-align:top;">
+									<span class="colhead">Grip</span><br>
+									<input id="txtSurface" type="Text" size="3"><br>
+
+									<input type="button" onclick="Grip(1.0, this.id)" value="Dry" id="buttongrip10" class="GripButton"><br>
+									<input type="button" onclick="Grip(0.5, this.id)" value="Wet" id="buttongrip04" class="GripButton"><br>
+									<input type="button" onclick="Grip(0.1, this.id)" value="Icy" id="buttongrip01" class="GripButton"><br>
+
+								</td>
+								<td style="vertical-align:top;">
+									<span class="colhead">VPM</span><br>
+									<input id="txtVPM" type="Text" size="2"><br>
+
+									<input type="button" onclick="VehiclesPerMinute(40, this.id)" value="40 VPM" id="buttonVPM40" class="VPMButton"><br>
+									<input type="button" onclick="VehiclesPerMinute(35, this.id)" value="35 VPM" id="buttonVPM35" class="VPMButton"><br>
+									<input type="button" onclick="VehiclesPerMinute(30, this.id)" value="30 VPM" id="buttonVPM30" class="VPMButton"><br>
+									<input type="button" onclick="VehiclesPerMinute(25, this.id)" value="25 VPM" id="buttonVPM25" class="VPMButton"><br>
+									<input type="button" onclick="VehiclesPerMinute(20, this.id)" value="20 VPM" id="buttonVPM20" class="VPMButton"><br>
+								</td>
+							</tr>
+						</table>
+					</form>
+				</td>
+
+				<td>
+					<form name="SpeedNow" action="#">
+							<input id="btnDriveLeft" type="button" onclick="DriveLeft()" value="Drive Left" >
+							<input id="btnDriveRight" type="button" onclick="DriveRight()" value="Drive Right" >
+					</form>
+					<span style="font:14px arial, sans-serif;" id="comfort">Road Speed<br>Road Surface<br>Vehicles Per Minute<br>Comformt Factor</span><br><br>
+
+					<div id="danger">
+						<!-- <table width="100%" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="FFFFFF"><tr> -->
+						<table style=" border:1px solid black; border-spacing:0px; text-align:center; width:100%;"><tr>
+							<!-- <td colspan="20"><font face="Arial, Helvetica, sans-serif" size="1">Danger level</font></td></tr><tr> -->
+							<td colspan="20" style="font:14px arial, sans-serif;">Danger level</td></tr><tr>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							<td  style="background-color:red">&nbsp;</td>
+							</tr>
+						</table>
+					</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+<br><br>
+
+<!-- <table border='0' cellspacing='6' cellpadding='6'  ID="lowertable" width='100%'> -->
+<table style="border:1px solid black; border-spacing:5px; border-radius:10px; width:100%;" ID="lowertable">
+	<tr><td style="padding:2px 15px;" colspan='2'><h1>How phantom traffic jams occur</h1>
+		<h3>This illustration cannot accurately represent all the factors that affect a stream of traffic -
+				use it only as an aid to understanding your own experiences.</h3></td></tr>
+
+	<tr>
+		<td style="width:50%; padding:2px 15px; vertical-align:top;">
+			<h3>How the illustration has been programmed</h3>
+
+				<p>70 vehicles are randomly created between between 4.0m
+				and 7.0m long with most being 4.5m long. This is to represent traffic in a lane that does not expect lorries or very long vehicles, normally the outer lanes.<br>
+				<br>
+				Drivers are given random reaction times of between 0.7 seconds
+				and 2.5 seconds with most being around 1.25 seconds. This is the thinking
+				time plus the time to move between accelerator and brake.<br>
+				<br>
+				Because the vehicles and drivers are created randomly, every time
+				you refresh the page you get a different set of vehicles and drivers.
+				The overall behaviour of the traffic will be different each time.<br>
+				<br>
+				The lead car can accelerate at 1.0g and decelerate at 1.0g<br>
+				All other vehicles can accelerate at 0.2g and decelerate at 0.7g in dry conditions. The deceleration figure compares with 0.65 m/s/s used in the Highway Code for stopping distances when dry. In wet conditions stopping distances are doubled and when it's icy stopping distances are 10 times longer.<br>
+				<br>
+				Drivers do not start braking behind the vehicle in front until they've
+				come within range. That is, they do not even contempate slowing down
+				if they are more than 5 times their intended gap.<br>
+				<br>
+				The maximum speed of the road is 80mph - no vehicles can travel faster
+				than 80mph. In reality many do, but here we'll presume most people are sensible.<br>
+				<br>
+				I have not adopted the notion of Passenger Car Units (PCU and PCU/hr) because most motorway journeys involve a mix of cars, trucks, vans, small lorries and large lorries, and hours are too coarse a time scale when flows vary from minute to minute. Vehicles per minute seems more pragmatic.<br>
+				<br>
+				All the math is done in javascript using normal laws of motion, each vehicle looking at the rear of the vehicle ahead.<br>
+				<br>
+				This is not an attempt at great science but simply a tool to illustrate what can happen. Feel free to copy the source and alter it to make a better example (as long as this for education and not for profit).
+				</p>
+
+			<h3>References</h3>
+				<p>The document referenced at <a href="http://www.visualexpert.com/Resources/reactiontime.html" target="_blank">www.visualexpert.com/Resources/reactiontime.html</a>
+				suggests a thinking time of 1.25 seconds for unexpected events such
+				as a vehicle ahead braking. <br>
+				<br>
+				Acceleration<br>
+				0.2g is approximately 0-60mph in 13 seconds.<br>
+				<br>
+				Deceleration / braking rate<br>
+				<a href="http://www.volvoclub.org.uk/pdf/SpeedStoppingDistances.pdf" target="_blank">
+				The rate of deceleration used is 8.5ms-2 [0.85g]. This would represent
+				a very high rate of deceleration such as may be achieved by a car
+				fitted with ABS when braking on a dry road. A rate of deceleration
+				of 4ms-2 [0.4g] would represent the sort of deceleration that might
+				be achieved on a wet road surface. </a>
+				</p>
+
+			<h3>Recommendations</h3>
+				<p>Education, carrot and stick. There are plenty of ways of educating drivers using articles in newspapers, on television and other media. The carrot would be that the inside lane will always be best maintained and give a more comfortble ride. (Obviously some costs here but considering the alternatives of building more lanes or converting the hard shoulder, the cost of keeping inside lane well maintained AND making sure that people know, must surely be cheaper.) The stick is for people who go too slow or too fast or simply don't move over to let others overtake. This also applies in average speed check zones where speed differences are usually small but frustrating.<br><br>
+
+				In the early days of motorways they prohibited slow traffic with explicit signs on the slip roads.<br>
+				<img src='img/slip-road-sign-min.png' alt ='road sign'/><br>
+				<br>
+				Today it could be appropriate to have a sign saying
+				</p>
+					<ul>
+					<li>please do at least 60 mph where possible</li>
+					<li>let people overtake easily</li>
+					<li>do not rush past when overtaking</li>
+					</ul>
+
+				<p>And maybe (tongue in cheek)
+				</p>
+					<ul>
+					<li>The middle lane is not yours to keep</li>
+					<li>If you normally drive slower than 60 mph please travel between 20:00 and 06:00</li>
+					</ul>
+		</td>
+
+
+		<td style="width:50%; padding:2px 15px; vertical-align:top;">
+			<h3>Tracking speed</h3>
+				<p>To keep the action on screen the camera
+				moves to keep pace with the lead car; effectively this is the road
+				speed &#8211; slower cars dropping behind and faster cars catching
+				up.<br>
+				<br>
+				Remember, the lead car may accelerate and brake for all sorts of reasons: the road ahead might suddenly seem clear or the road head is suddenly blocked by another vehicle moving into that lane. Test it!
+				</p>
+
+			<h3>Traffic Flow</h3>
+				<p> Traffic
+				flow is measured here in vehicles per minute. You can adjust the circumstantial
+				traffic flow using the buttons. This way you can simulate the effect
+				sudden changes caused by vehicles joining or leaving the flow from
+				junctions or extra cars in your lane as they need to move over.
+				</p>
+
+			<h3>The safe gap</h3>
+				<p>If all vehicles could maintain a 2 second gap the flow would be just
+				under 30 vehicles per minute, depending on the general speed. The vehicles you find in your stream
+				will have a random mix of desired gaps, ranging from 0.2 (crazy) to
+				4 (very safe) seconds. By adjusting the flow, say from 30 VPM to 40
+				VPM, you would force all drivers to compromise their desired gap to
+				accommodate the new circumstance. This would cause the &quot;comfort
+				factor&quot; to be changed.. The &quot;comfort factor&quot;
+				is a notional measure intended to indicate the variation from the
+				driver's preferred gap. Your desired safe gap may be compromised by
+				events beyond your control.<br>
+				<br>
+				Some opinions assert that a gap of 2 car lengths should be maintained.
+				A few moments thinking about this will easily show that this advice
+				is flawed. The safe distance to be maintained will depend on speed.
+				The faster you travel the more distance you will need to be able to
+				react and slow down.
+				</p>
+
+			<h3>Grip</h3>
+				<p>The ability of cars to brake in response to an emergency is determined by the grip available.
+				In dry conditions we'll assume this is 100%. Grip reduces through
+				damp and wet conditions to about 10% in icy conditions.
+				</p>
+
+			<h3>Fluctuations</h3>
+				<p>The illustration shows a single lane of traffic. If the conditions remained steady this lane could be be quite safe. HOWEVER, the reality is that the conditions are not steady. Even in a 50 mph average speed check zone you'll occasionally find some fool doing 40. This has the effect of forcing others into outer lanes and thereby severely affecting the density in those lanes and necessitating emergency slowing to accommodate the traffic sqeezing in. Count that as 2 effects: denser traffic and car in front slowing to recover a desired gap. You can play with the buttons to see what happens. And, of course, it's the same when a lorry occupies the middle lane on a busy motorway - sometimes for 10 minutes - in a selfish attempt to overtake another lorry going slightly slower, or even sadder, overtaking a car! People just don't realise that driving slowly is not safer: it is more likely to cause an accident than if they just drove at the speed of the majority.<br>
+				<br>
+				The thing is, if we didn't have slow drivers forcing others to overtake and if we didn't have fast drivers bearing down in the next lane out, thus preventing comfortable overtaking, fluctuations in speed and traffic density (per lane) would be much less and the road would be safer and deliver more vehicles per minute.
+				</p>
+
+			<h3>Conclusion</h3>
+				<p>In the end it's not about affording a few people a fast journey but more about affording a lot of people a safe journey. When motorways are nearly empty it's quite possible for a speedy driver to thread through the gaps and achieve a quick journey time (often at the expense of others), but once those gaps are gone it's a question of getting vehicles per minute along the road - and that can only be achieved with a <strong>smooth traffic flow</strong> and no one needing other people to slow down to make room for them. Of course, this is easier said than achieved, given the variable densities that occur at rush hours and at junctions.
+				</p>
+
+				<p>Please visit <a href="https://newsway.co.uk/#contact" target="_blank">contact me</a> to leave your comments.
+				</p>
+
+			</td>
+
+		</tr>
+</table>
+
+
+<NOSCRIPT>
+	<P>Javascript is not currently enabled on your browser. If you can enable it, your input will be checked as you enter it (on most browsers, at least). You may find this helpful. </P>
+</NOSCRIPT>
+
+
+<HR>
+  <!-- ====================================== -->
+  <DIV STYLE="clear: left; font-size: 1px; ">&nbsp;</DIV> <!-- needed to make IE display properly :-(  -->
+
+</DIV>
+<!-- end page   -->
+
+<script>
+    timedCount();
+</script>
+
+
+
+
+<script>
+
+var surl = unescape(window.location);
+var mtoft = 3.28084;
+var boo = (surl.match(/newsway|localhost|sony|safegap/) == null); //not a newsway site
+var element_comfort = document.getElementById('comfort');
+var element_msg_to = document.getElementById('msg_to');
+var element_msg_to_name = document.getElementById('msg_to_name');
+
+if(boo){
+//alert('about to relocate to newsway.co.uk');
+window.location='https://www.newsway.co.uk/safegap/traffic2.htm';
+}
+
+//this section is for the table selectable to send a message
+var td1 = null;
+var td2 = null;
+var td3 = null;
+
+function highlight(obj) {
+	if (td1 || td2 || td3) {
+		td1.className = null;
+		td2.className = null;
+		td3.className = null;
+	}
+
+	obj.cells[0].className = "select";
+	obj.cells[1].className = "select";
+	obj.cells[2].className = "select";
+
+	td1 = obj.cells[0];
+	td2 = obj.cells[1];
+	td3 = obj.cells[2];
+
+	//alert(td1.innerHTML);
+	element_msg_to.value=td1.innerHTML;
+	element_msg_to_name.style.backgroundColor = "#00FF00";
+	element_msg_to_name.innerHTML=td1.innerHTML + " " + td2.innerHTML;
+	setTimeout(highlighter, 500);
+}
+
+
+<!-- function highlighter(obj) { -->
+	<!-- element_msg_to_name.style.backgroundColor = "#DCDCDC"; -->
+<!-- } -->
+
+
+init();
+function init() {
+    var i = 0;
+    for (i = 1; i <= ncars; i++) {
+        cars[i] = new car(i);
+    }
+
+	for (i = 0; i < nDashes; i++) {
+		dashes[i]= new dash(i);
+    }
+    dashes[i]= new dash(i);
+
+    // set their positions
+	cars[1].X=50;
+	
+    for (i = 2; i <= ncars; i++) {
+		//cars[i].X = cars[i-1].X + cars[i-1].width + 20;
+		cars[i].X = cars[i-1].X + cars[i-1].width + gapsec[i]*SPEED;
+        cars[i].obj.left = cars[i].X + "px";
+        cars[i].obj.top = cars[i].Y + "px";
+	}
+
+	for (i = 0; i < nDashes; i++) {
+
+		dashes[i].X = i * n_dash_spacing;
+        dashes[i].Y = Ypos;
+
+		dashes[i].obj.left = dashes[i].X + "px";
+        dashes[i].obj.top = dashes[i].Y + "px";
+	}
+
+	//beyond i
+	dashes[i].X = 0;
+	dashes[i].Y = 0;
+
+	dashes[i].obj.left = dashes[i].X + "px";
+	dashes[i].obj.top = dashes[i].Y + "px";
+
+	setTimeout("startanimate()", 10);
+
+	DriveAspiredSpeed(29, 'button29');
+	Grip(1.0, 'buttongrip10');
+	VehiclesPerMinute(30, 'buttonVPM30');
+	DriveLeft();
+}
+
+
+function car(i) {
+    this.X = Xpos;
+    this.Y = Ypos;
+
+	this.carspeed = carspeed[i];
+	this.accel = accel[i];
+	this.decel = decel[i];
+	this.thinkmax = thinkmax[i];
+	this.thinknow = thinknow[i];
+	this.gapsec = gapsec[i];
+
+	this.width = w[i];
+
+    if (isNetscape) {
+        this.obj = eval("document.car" + i);
+    } else {
+        this.obj = eval("car" + i + ".style");
+    }
+}
+
+
+function dash(i) {
+    this.X = Xpos;
+    this.Y = Ypos - 100;
+    this.dx = 0;
+    this.dy = 0;
+    if (isNetscape) {
+        this.obj = eval("document.dash" + i);
+    } else {
+        this.obj = eval("dash" + i + ".style");
+    }
+}
+
+
+
+function resetpositions() {
+	//similar to init
+    var i = 0;
+
+	//carspermin later get from athe from
+	var CPM = 30;
+
+	//total gap in metres
+	var SigmaGM = 0;
+
+	//i reckon that
+	SigmaGM = (ncars * 60 * SPEED / CPM) - SigmaL;
+
+	var gapshare=0;
+
+	gapshare = SigmaGM/(ncars-1);
+
+    // set their positions
+	cars[1].X=50;
+
+    for (i = 2; i <= ncars; i++) {
+		//cars[i].X = cars[i-1].X + cars[i-1].width + 20;
+		cars[i].X = cars[i-1].X + cars[i-1].width + gapshare;
+        cars[i].obj.left = cars[i].X + "px";
+        cars[i].obj.top = cars[i].Y + "px";
+	}
+}
+
+
+
+function startanimate() {
+	// recalculate positions every DELTAT millisecs
+    setInterval("animate()", DELTAT * 1000);
+	//every n milliseconds
+	setInterval("movedashes()", DASH_RECALC * 1000);
+}
+
+
+
+function animate() {
+//every DELTAT secs
+
+var steady_cpm = 0;
+var steady_speed = 0;
+var steady_gap = 0;
+var steady_grip = null;
+
+    cars[1].X = 50;
+	// move img to new position
+	cars[1].obj.left = cars[1].X + "px";
+	cars[1].obj.top = Ypos + CarOffsetY + "px"; //cars[0].Y;
+
+	//new speed for lead car/road ----- use 2 as m/s/s
+	// SPEED_JITTER is used to stop speed going up and down near aspired speed - stop cars jittering on screen
+	var SPEED_JITTER = 0.001;
+	if ( ASPIRED_SPEED - SPEED > SPEED_JITTER ) SPEED += DASH_RECALC * g;
+	if ( SPEED - ASPIRED_SPEED > SPEED_JITTER ) SPEED -= DASH_RECALC * g;
+
+	//new speed for leading car
+	cars[1].carspeed = SPEED;
+
+	var bsteady = true;
+
+	//From March 2009 gap should be modified by a GAP_MULTIPLIER calculated from a forced CarsPerMinute
+	var TimeForAverageCar = SigmaL/(ncars * SPEED);
+	var AverageGapSecsNow = (60/CARS_PER_MINUTE) - TimeForAverageCar;
+	GAP_MULTIPLIER = AverageGapSecsNow/(SigmaG/ncars);
+
+
+	//after 60 seconds tell the car number as cpm
+	var elapsedsecs = 0;
+	var allCarsYpospx = Ypos + CarOffsetY + "px";
+
+	var start = 2;
+    for (i = start ; i <= ncars; i++ ) {
+
+		var gapsec_this = cars[i].gapsec * GAP_MULTIPLIER;  //try not worrying about a minimum
+
+		var gapnow_m = cars[i].X - cars[i - 1].X - cars[i - 1].width //metres
+		if (gapnow_m < 0) gapnow_m = 0;	//metres
+		if (cars[i].carspeed > 0) {
+			var gapnow = gapnow_m / cars[i].carspeed; //seconds
+		} else {
+			var gapnow = 100; //here it locks the queue if 1
+		}
+
+		//increment per car
+		elapsedsecs += gapnow + (cars[i - 1].width / SPEED);
+
+		//reset thinking time when at chosen gap
+		if (gapnow == gapsec_this) cars[i].thinknow = 0;
+
+		if (gapnow < gapsec_this) {
+			//slow down after thinking
+			if (cars[i].thinknow < (cars[i].thinkmax * REACTION_TIME_FACTOR)) {
+				cars[i].thinknow += DELTAT;
+			} else {
+				cars[i].carspeed -= cars[i].decel * BRAKING_DISTANCE_FACTOR * DELTAT;
+				if (gapnow == 0) cars[i].carspeed = cars[i - 1].carspeed - 1;
+			}
+			if (Math.abs(SPEED - cars[i].carspeed) > 1) {bsteady = false};
+		}
+
+		if (gapnow > gapsec_this) {
+			//speed up after thinking
+			if (cars[i].thinknow < (cars[i].thinkmax * REACTION_TIME_FACTOR)) {
+				cars[i].thinknow += DELTAT;
+			} else {
+				cars[i].carspeed += cars[i].accel * DELTAT;
+				//but limit the maximum speed
+				if (cars[i].carspeed > 40) cars[i].carspeed = 40;
+
+				//now check distance to car ahead and consider slowing down
+				var intendedgap_m = cars[i-1].carspeed * gapsec_this; //metres
+
+
+				if ((gapnow_m > (intendedgap_m * 2)) && (gapnow < (intendedgap_m * 5))) {
+					//car is in range where action may be considered
+					//is following car going faster?
+					if (cars[i].carspeed > cars[i-1].carspeed) {
+						//start deceleration to arrive at intendedgap_m evenly
+						//a=v^2-u^2/2s
+						var d = (cars[i-1].carspeed ^ 2 - cars[i].carspeed ^ 2) / (2 * (gapnow_m - intendedgap_m));
+						if (d > decel[i] * BRAKING_DISTANCE_FACTOR) {
+							d = decel[i] * BRAKING_DISTANCE_FACTOR; //can't exceed maximum braking deceleration
+						}
+						cars[i].carspeed -= d * DELTAT;
+					}
+				}
+			}
+			if (Math.abs(SPEED - cars[i].carspeed) > 1) {bsteady = false};
+		}
+
+		if (cars[i].carspeed < 0)
+		{
+			cars[i].carspeed = 0;
+			var newX = cars[i].X + (SPEED * DELTAT);
+			//document.Alerts1.alert11.value='Car ' + i + ' was stationary';
+		} else {
+			//var newX = cars[i - 1].X + cars[i - 1].width + (gapnow * cars[i].carspeed);
+			var newX = cars[i].X + ((SPEED - cars[i].carspeed) * DELTAT);
+		}
+		cars[i].X = newX;
+
+        // move img to new position
+        cars[i].obj.left = cars[i].X + "px";
+		cars[i].obj.top = allCarsYpospx;
+    }
+
+	//try here every 18 cycles
+	cyclecount++;
+
+	if (cyclecount > 18) {
+		document.AspiredSpeed.txtSpeed.value = Math.round(ASPIRED_SPEED * 2.23)+" mph";
+		document.AspiredSpeed.txtVPM.value = CARS_PER_MINUTE;
+
+		var grip = BRAKING_DISTANCE_FACTOR;
+		var s_grip = null;
+			if (grip > 0.9) {
+				s_grip = 'dry';
+			} else if (grip > 0.6) {
+				s_grip = 'damp';
+			} else if (grip > 0.3) {
+				s_grip = 'wet';
+			} else if (grip > 0.01) {
+				s_grip = 'icy';
+			} else {
+				s_grip = 'unknown'
+			}
+
+		//Cars per minute
+		var CarsPerMinute = Math.round(ncars * 60/elapsedsecs);
+		var s_comfort = null;
+
+		if (SPEED==steady_speed) {
+			s_comfort = "Road speed: " + Math.round(SPEED * 2.23) +"mph / " + Math.round(SPEED * 3.6) +"kph";
+		} else {
+			s_comfort = "Road speed: <span style='color:black;background-color:#00ff66'>" + Math.round(SPEED * 2.23) +"mph / " + Math.round(SPEED * 3.6) +"kph</span>";
+			steady_speed = SPEED;
+		}
+
+		if (s_grip==steady_grip) {
+			s_comfort += "<br>Road surface: " + s_grip;
+		} else {
+			s_comfort += "<br>Road surface: <span style='color:black;background-color:#00ff66'>" + s_grip + "</span>";
+			steady_grip = s_grip;
+		}
+
+		if(bsteady){
+			s_comfort += "<br>Vehicles per minute: " + CarsPerMinute;
+		} else {
+			s_comfort += "<br>Vehicles per minute: <span style='color:black;background-color:#00ff66'>" + CarsPerMinute + " when steady</span>";
+		}
+
+
+		if (GAP_MULTIPLIER==steady_gap) {
+			s_comfort += "<br>Comfort factor: " + Math.round(GAP_MULTIPLIER * 100) + "% of your desired gap";
+		} else {
+			s_comfort += "<br>Comfort factor: <span style='color:black;background-color:#00ff66'>" + Math.round(GAP_MULTIPLIER * 100) + "% of your desired gap</span>";
+			steady_gap = GAP_MULTIPLIER;
+		}
+
+		document.AspiredSpeed.txtSurface.value=s_grip;
+
+		element_comfort.innerHTML = s_comfort;
+
+		cyclecount = 0;
+	}
+}
+
+
+
+
+function movedashes() {
+	start = 0;
+
+	// get size of window
+	var height, width;
+	if (isNetscape) {
+		height = window.innerHeight + window.pageYOffset;
+		//width = window.innerWidth + window.pageXOffset;
+		width = window.innerWidth;
+	} else {
+		height = document.body.clientHeight + document.body.scrollTop;
+		//width = document.body.clientWidth - document.body.scrollLeft;
+		width = document.body.clientWidth;
+	}
+	
+	//9 is empirical - don't know what happened - it was fine before HTML5
+	var dashesYpospx = Ypos + 9 + "px";
+
+	for (i = start ; i < nDashes; i++ ) {
+		// move to new position
+		dashes[i].X += (SPEED * DASH_RECALC);
+
+		if (dashes[i].X >= width) {
+			var lastdash = 0;
+			lastdash = i + 1;
+			if (lastdash > nDashes) lastdash = 0;
+			dashes[i].X = 1 - DASHSIZE;
+		}
+
+		// move img to new X position 
+		//-2 to stop gaps appearing
+		dashes[i].obj.left = dashes[i].X -2 + "px";	
+		dashes[i].obj.top = dashesYpospx;			
+	}
+}
+
+
+function Mouse(evnt){
+	var targetElementID="maintable0";
+	var targetElement=document.getElementById(targetElementID);
+
+	if (targetElement && document.documentElement.offsetHeight
+	        && targetElement.offsetHeight && targetElement.offsetTop) {
+	Ypos = targetElement.offsetTop + targetElement.offsetHeight - 1;
+	}
+
+	dashes[3].obj.top =  Ypos + RoadWidth + "px";
+}
+
+window.onresize = Mouse;
+window.onload = Mouse;
+
+//end block 5 -->
+</script>
+
+</body>
+</html>

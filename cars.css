@@ -1,0 +1,46 @@
+body {
+
+	background-color: #FFFFFF;
+
+	font-family: arial, helvetica, sans-serif; 
+
+	font-size: smaller;
+
+	color: #000000;
+}
+	.selectable td {
+			border: 1px #ccc solid;
+			font-size: 70%; 
+			text-align: center;	
+		}
+	
+	
+	
+
+
+
+	.select {
+		background-color: yellow;	
+	}
+	
+	
+	.tright {
+	vertical-align: bottom;
+	font-size: 70%;
+	font-family: Arial, Helvetica, sans-serif;
+	border: none;
+	width: 100%;
+	}
+	  
+	.formtab TD { 
+	padding: 0.1em; 
+	height: 1.1em; 
+	font-size: 70%; 
+	}
+		  
+	.formtab INPUT {
+	border: 1 solid;
+	font-size: 100%;
+	background-color: #FFFFCC;
+
+	}
