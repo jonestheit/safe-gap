@@ -7,7 +7,8 @@ var element_msg_to_name = document.getElementById('msg_to_name');
 
 if(boo){
 //alert('about to relocate to newsway.co.uk');
-window.location='https://www.newsway.co.uk/safegap/traffic2.htm';
+//2020-08-29 skip this - just run it wherever with a thumbs up to Brian Jones
+//window.location='https://www.newsway.co.uk/safegap/traffic2.htm';
 }
 
 //this section is for the table selectable to send a message
