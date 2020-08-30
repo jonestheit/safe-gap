@@ -13,4 +13,4 @@
 
  Back in 2008 there was also a version of this that used PHP and MySQL to make contact with nearby drivers using a WhatsApp style of exchange. This got too much extra work and I abandoned it. Might be worth a second look though, now that internet speeds are faster.
 
-You can see a <a href="https://newsway.co.uk/safegap/traffic2.htm" target="_blank">demo</a> at newsway.co.uk
+You can see a <a href="https://newsway.co.uk/safegap/traffic2.htm">demo</a> at newsway.co.uk
